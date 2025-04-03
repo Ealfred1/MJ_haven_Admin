@@ -1,0 +1,57 @@
+users
+
+
+GET
+/api/users/dashboard-stats/
+
+
+Parameters
+Cancel
+No parameters
+
+Execute
+Clear
+Responses
+Curl
+
+curl -X 'GET' \
+  'http://localhost:8000/api/users/dashboard-stats/' \
+  -H 'accept: */*' \
+  -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ0b2tlbl90eXBlIjoiYWNjZXNzIiwiZXhwIjoxNzQzNTg4OTkyLCJpYXQiOjE3NDM1NTI5OTIsImp0aSI6IjQ4NDUzOGMxMzVkMzQyYzY4YzAxNmQ5OTVlNGE4YWQyIiwidXNlcl9pZCI6M30.iVt-PZ4XHGuKKTorN5ROp6_IYjNDbt9aQKRgTOXk-zQ'
+Request URL
+http://localhost:8000/api/users/dashboard-stats/
+Server response
+Code	Details
+200	
+Response body
+Download
+{
+  "total_revenue": "0.00",
+  "total_properties_listed": 8,
+  "total_active_bookings": 0,
+  "pending_bookings": 0,
+  "sales_revenue": {
+    "last_month": "0.00",
+    "this_month": "0.00",
+    "monthly_breakdown": {
+      "Jan": "0.00",
+      "Feb": "0.00",
+      "Mar": "0.00",
+      "Apr": "0.00",
+      "May": "0.00",
+      "Jun": "0.00",
+      "Jul": "0.00",
+      "Aug": "0.00",
+      "Sep": "0.00",
+      "Oct": "0.00",
+      "Nov": "0.00",
+      "Dec": "0.00"
+    }
+  },
+  "recent_transactions": []
+}
+
+Niow e uys consume APIs for the dashboard as you can see thus endpoints reunw the stats info needed by the dashboard as well as the info for the chart to be drawn as well as the recent trasnavction !
+
+then for the ecent booigns fctehcng th elist of bookings like done in the booign oage but cap it to 5 list!
+so yeh consuem APIs for this and reutn the full code

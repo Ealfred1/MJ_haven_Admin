@@ -189,11 +189,11 @@ export function PropertyModal({ isOpen, onClose, property, onSuccess }: Property
     if (e.target.files && e.target.files[0]) {
       const file = e.target.files[0]
 
-      // Check file size (max 5MB for images)
-      if (file.size > 5 * 1024 * 1024) {
+      // Check file size (max 50MB for images)
+      if (file.size > 50 * 1024 * 1024) {
         toast({
           title: "Error",
-          description: "Image size should be less than 5MB",
+          description: "Image size should be less than 50MB",
           variant: "destructive",
         })
         return
@@ -209,12 +209,12 @@ export function PropertyModal({ isOpen, onClose, property, onSuccess }: Property
     if (e.target.files && e.target.files.length > 0) {
       const filesArray = Array.from(e.target.files)
 
-      // Check each file size (max 5MB for images)
+      // Check each file size (max 50MB for images)
       const validFiles = filesArray.filter((file) => {
-        if (file.size > 5 * 1024 * 1024) {
+        if (file.size > 50 * 1024 * 1024) {
           toast({
             title: "Warning",
-            description: `Image ${file.name} is larger than 5MB and will be skipped`,
+            description: `Image ${file.name} is larger than 50MB and will be skipped`,
             variant: "destructive",
           })
           return false
@@ -610,9 +610,7 @@ export function PropertyModal({ isOpen, onClose, property, onSuccess }: Property
                   <div className="flex justify-between items-center mb-2">
                     <label className="block text-sm font-medium text-gray-700">
                       Property Media*
-                      <span className="text-xs font-normal text-gray-500 ml-1">
-                        (Images: max 5MB each, Videos: max 50MB each)
-                      </span>
+                      <span className="text-xs font-normal text-gray-500 ml-1">(Images & Videos: max 50MB each)</span>
                     </label>
 
                     {(mainImagePreview || additionalImagePreviews.length > 0 || videoPreviews.length > 0) && (

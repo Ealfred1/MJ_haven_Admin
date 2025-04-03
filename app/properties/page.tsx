@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect, useRef } from "react"
 import { useAuth } from "@/contexts/auth-context"
 import { Sidebar } from "@/components/sidebar"
@@ -65,6 +67,7 @@ export default function PropertiesPage() {
   const [properties, setProperties] = useState<Property[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isPropertyDetailLoading, setIsPropertyDetailLoading] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
   const [searchTerm, setSearchTerm] = useState("")
   const [totalProperties, setTotalProperties] = useState(0)
   const [isPropertyModalOpen, setIsPropertyModalOpen] = useState(false)
@@ -170,7 +173,8 @@ export default function PropertiesPage() {
     setCurrentPage(page)
   }
 
-  const toggleDropdown = (propertyId: number) => {
+  const toggleDropdown = (propertyId: number, e: React.MouseEvent) => {
+    e.stopPropagation()
     if (activeDropdown === propertyId) {
       setActiveDropdown(null)
     } else {
@@ -178,11 +182,18 @@ export default function PropertiesPage() {
     }
   }
 
-  const handleDeleteProperty = async (propertyId: number) => {
+  const handleDeleteProperty = async (propertyId: number, e: React.MouseEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
+    
+    // Log for debugging
+    console.log("Delete property clicked", propertyId)
+
     if (!confirm("Are you sure you want to delete this property? This action cannot be undone.")) {
       return
     }
 
+    setIsDeleting(true)
     try {
       await api.delete(`/api/properties/${propertyId}/`)
 
@@ -193,6 +204,9 @@ export default function PropertiesPage() {
 
       // Refresh the properties list
       fetchProperties(currentPage, searchTerm)
+
+      // Close dropdown
+      setActiveDropdown(null)
     } catch (error) {
       console.error("Failed to delete property:", error)
       toast({
@@ -200,18 +214,33 @@ export default function PropertiesPage() {
         description: "Failed to delete property. Please try again.",
         variant: "destructive",
       })
+    } finally {
+      setIsDeleting(false)
     }
   }
 
-  const handleAddFeatures = (property: Property) => {
+  const handleAddFeatures = (property: Property, e: React.MouseEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
+    
+    // Log for debugging
+    console.log("Add features clicked", property.id)
+
     setSelectedProperty(property)
     setIsFeatureModalOpen(true)
     setActiveDropdown(null)
   }
 
-  const handleEditProperty = (property: Property) => {
+  const handleEditProperty = (property: Property, e: React.MouseEvent) => {
+    e.stopPropagation()
+    e.preventDefault()
+
     handleOpenPropertyModal(property)
     setActiveDropdown(null)
+  }
+
+  const handleCloseFeatureModal = () => {
+    setIsFeatureModalOpen(false)
   }
 
   return (
@@ -332,8 +361,8 @@ export default function PropertiesPage() {
                         <div className="relative" ref={dropdownRef}>
                           <button
                             className="p-1.5 bg-white rounded-full shadow-sm hover:bg-gray-100"
-                            onClick={() => toggleDropdown(property.id)}
-                            disabled={isPropertyDetailLoading}
+                            onClick={(e) => toggleDropdown(property.id, e)}
+                            disabled={isPropertyDetailLoading || isDeleting}
                           >
                             <MoreVertical className="h-4 w-4 text-gray-600" />
                           </button>
@@ -342,7 +371,7 @@ export default function PropertiesPage() {
                             <div className="absolute right-0 mt-1 w-48 bg-white rounded-md shadow-lg z-10 border">
                               <div className="py-1">
                                 <button
-                                  onClick={() => handleEditProperty(property)}
+                                  onClick={(e) => handleEditProperty(property, e)}
                                   className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                                   disabled={isPropertyDetailLoading}
                                 >
@@ -350,7 +379,7 @@ export default function PropertiesPage() {
                                   Edit Property
                                 </button>
                                 <button
-                                  onClick={() => handleAddFeatures(property)}
+                                  onClick={(e) => handleAddFeatures(property, e)}
                                   className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                                   disabled={isPropertyDetailLoading}
                                 >
@@ -358,11 +387,14 @@ export default function PropertiesPage() {
                                   Add Features
                                 </button>
                                 <button
-                                  onClick={() => handleDeleteProperty(property.id)}
+                                  onClick={(e) => handleDeleteProperty(property.id, e)}
                                   className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
-                                  disabled={isPropertyDetailLoading}
                                 >
-                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  {isDeleting ? (
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                  )}
                                   Delete Property
                                 </button>
                               </div>
@@ -495,7 +527,7 @@ export default function PropertiesPage() {
       {selectedProperty && (
         <FeatureModal
           isOpen={isFeatureModalOpen}
-          onClose={() => setIsFeatureModalOpen(false)}
+          onClose={handleCloseFeatureModal}
           propertyId={selectedProperty.id}
           onSuccess={handlePropertyCreated}
         />
@@ -503,4 +535,3 @@ export default function PropertiesPage() {
     </div>
   )
 }
-

@@ -3,7 +3,7 @@
 import type React from "react"
 
 import { useState, useEffect, useRef } from "react"
-import { X, Upload, MapPin, Home, Plus, Trash2, Image, Check, Loader2, FileVideo } from "lucide-react"
+import { X, Upload, MapPin, Home, Plus, Trash2, Image, Check, Loader2, FileVideo, Play } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import api from "@/services/api"
 
@@ -11,7 +11,11 @@ interface PropertyImage {
   id: number
   image_url: string
   is_main: boolean
-  is_video?: boolean
+}
+
+interface PropertyVideo {
+  id: number
+  video_url: string
 }
 
 interface Property {
@@ -33,6 +37,7 @@ interface Property {
   is_available?: boolean
   main_image_url?: string
   images?: PropertyImage[]
+  videos?: PropertyVideo[]
   features?: any[]
   is_favorited?: boolean
   created_at?: string
@@ -63,14 +68,13 @@ export function PropertyModal({ isOpen, onClose, property, onSuccess }: Property
   const [mainImagePreview, setMainImagePreview] = useState("")
   const [mainImageId, setMainImageId] = useState<number | null>(null)
   const [additionalImages, setAdditionalImages] = useState<File[]>([])
-  const [additionalImagePreviews, setAdditionalImagePreviews] = useState<
-    { url: string; id?: number; isVideo?: boolean }[]
-  >([])
+  const [additionalImagePreviews, setAdditionalImagePreviews] = useState<{ url: string; id?: number }[]>([])
   const [videos, setVideos] = useState<File[]>([])
   const [videoPreviews, setVideoPreviews] = useState<{ url: string; id?: number }[]>([])
   const [clearImages, setClearImages] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isImageLoading, setIsImageLoading] = useState(false)
+  const [isVideoLoading, setIsVideoLoading] = useState(false)
   const [isPropertyLoading, setIsPropertyLoading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({})
   const additionalImagesInputRef = useRef<HTMLInputElement>(null)
@@ -140,20 +144,19 @@ export function PropertyModal({ isOpen, onClose, property, onSuccess }: Property
         setMainImageId(null)
       }
 
-      // Set additional images and videos
+      // Set additional images
       const nonMainImages = propertyData.images.filter((img) => !img.is_main)
-
-      // Separate videos from images
-      const videoItems = nonMainImages.filter((img) => img.is_video)
-      const imageItems = nonMainImages.filter((img) => !img.is_video)
-
-      setAdditionalImagePreviews(imageItems.map((img) => ({ url: img.image_url, id: img.id })))
-
-      setVideoPreviews(videoItems.map((video) => ({ url: video.image_url, id: video.id })))
+      setAdditionalImagePreviews(nonMainImages.map((img) => ({ url: img.image_url, id: img.id })))
     } else {
       setMainImagePreview(propertyData.main_image_url || "")
       setMainImageId(null)
       setAdditionalImagePreviews([])
+    }
+
+    // Set videos
+    if (propertyData.videos && propertyData.videos.length > 0) {
+      setVideoPreviews(propertyData.videos.map((video) => ({ url: video.video_url, id: video.id })))
+    } else {
       setVideoPreviews([])
     }
 
@@ -315,10 +318,10 @@ export function PropertyModal({ isOpen, onClose, property, onSuccess }: Property
 
     // If this is an existing video with an ID, delete it from the server
     if (videoToRemove.id && property?.id) {
-      setIsImageLoading(true)
+      setIsVideoLoading(true)
       try {
-        await api.delete(`/api/properties/${property.id}/delete_image/`, {
-          data: { image_id: videoToRemove.id },
+        await api.delete(`/api/properties/${property.id}/delete_video/`, {
+          data: { video_id: videoToRemove.id },
         })
 
         toast({
@@ -332,10 +335,10 @@ export function PropertyModal({ isOpen, onClose, property, onSuccess }: Property
           description: "Failed to delete video. Please try again.",
           variant: "destructive",
         })
-        setIsImageLoading(false)
+        setIsVideoLoading(false)
         return
       }
-      setIsImageLoading(false)
+      setIsVideoLoading(false)
     }
 
     // Remove from previews
@@ -387,11 +390,8 @@ export function PropertyModal({ isOpen, onClose, property, onSuccess }: Property
 
         // Update additional images
         if (response.data.images) {
-          const nonMainImages = response.data.images.filter((img) => !img.is_main && !img.is_video)
+          const nonMainImages = response.data.images.filter((img) => !img.is_main)
           setAdditionalImagePreviews(nonMainImages.map((img) => ({ url: img.image_url, id: img.id })))
-
-          const videoItems = response.data.images.filter((img) => img.is_video)
-          setVideoPreviews(videoItems.map((video) => ({ url: video.image_url, id: video.id })))
         }
       } catch (error) {
         console.error("Failed to delete main image:", error)
@@ -456,7 +456,7 @@ export function PropertyModal({ isOpen, onClose, property, onSuccess }: Property
     }
   }
 
-  const handleClearAllImages = () => {
+  const handleClearAllMedia = () => {
     if (confirm("Are you sure you want to clear all images and videos? This cannot be undone.")) {
       setMainImage(null)
       setMainImagePreview("")
@@ -466,6 +466,45 @@ export function PropertyModal({ isOpen, onClose, property, onSuccess }: Property
       setVideos([])
       setVideoPreviews([])
       setClearImages(true)
+    }
+  }
+
+  const uploadVideos = async (propertyId: number) => {
+    if (videos.length === 0) return
+
+    setIsVideoLoading(true)
+    try {
+      for (let i = 0; i < videos.length; i++) {
+        const formData = new FormData()
+        formData.append("videos", videos[i])
+
+        await api.post(`/api/properties/${propertyId}/upload_videos/`, formData, {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+          onUploadProgress: (progressEvent) => {
+            if (progressEvent.total) {
+              const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+              setUploadProgress((prev) => ({ ...prev, [`video_${i}`]: percentCompleted }))
+            }
+          },
+        })
+      }
+
+      toast({
+        title: "Success",
+        description: "Videos uploaded successfully",
+      })
+    } catch (error) {
+      console.error("Failed to upload videos:", error)
+      toast({
+        title: "Error",
+        description: "Failed to upload videos. Please try again.",
+        variant: "destructive",
+      })
+      throw error
+    } finally {
+      setIsVideoLoading(false)
     }
   }
 
@@ -511,13 +550,8 @@ export function PropertyModal({ isOpen, onClose, property, onSuccess }: Property
       }
 
       // Add additional images
-      additionalImages.forEach((image, index) => {
+      additionalImages.forEach((image) => {
         formData.append("images", image)
-      })
-
-      // Add videos
-      videos.forEach((video, index) => {
-        formData.append("videos", video)
       })
 
       let response
@@ -535,6 +569,11 @@ export function PropertyModal({ isOpen, onClose, property, onSuccess }: Property
             }
           },
         })
+
+        // Upload videos separately
+        if (videos.length > 0) {
+          await uploadVideos(property.id)
+        }
       } else {
         // Create new property
         response = await api.post("/api/properties/", formData, {
@@ -548,6 +587,11 @@ export function PropertyModal({ isOpen, onClose, property, onSuccess }: Property
             }
           },
         })
+
+        // Upload videos separately for the newly created property
+        if (videos.length > 0 && response.data.id) {
+          await uploadVideos(response.data.id)
+        }
       }
 
       toast({
@@ -616,7 +660,7 @@ export function PropertyModal({ isOpen, onClose, property, onSuccess }: Property
                     {(mainImagePreview || additionalImagePreviews.length > 0 || videoPreviews.length > 0) && (
                       <button
                         type="button"
-                        onClick={handleClearAllImages}
+                        onClick={handleClearAllMedia}
                         className="text-xs text-red-600 hover:text-red-800 flex items-center"
                       >
                         <Trash2 className="h-3 w-3 mr-1" />
@@ -764,7 +808,7 @@ export function PropertyModal({ isOpen, onClose, property, onSuccess }: Property
                         type="button"
                         onClick={() => videoInputRef.current?.click()}
                         className="text-xs text-primary hover:text-primary-600 flex items-center"
-                        disabled={isImageLoading || isSubmitting}
+                        disabled={isVideoLoading || isSubmitting}
                       >
                         <Plus className="h-3 w-3 mr-1" />
                         Add Videos
@@ -776,7 +820,7 @@ export function PropertyModal({ isOpen, onClose, property, onSuccess }: Property
                         multiple
                         onChange={handleVideoUpload}
                         className="hidden"
-                        disabled={isImageLoading || isSubmitting}
+                        disabled={isVideoLoading || isSubmitting}
                       />
                     </div>
 
@@ -784,7 +828,12 @@ export function PropertyModal({ isOpen, onClose, property, onSuccess }: Property
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                         {videoPreviews.map((video, index) => (
                           <div key={index} className="relative border border-gray-200 rounded-lg overflow-hidden h-32">
-                            <video src={video.url} className="w-full h-full object-cover" controls />
+                            <div className="relative w-full h-full">
+                              <video src={video.url} className="w-full h-full object-cover" muted />
+                              <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                                <Play className="h-10 w-10 text-white opacity-80" />
+                              </div>
+                            </div>
                             <div className="absolute inset-0 bg-black/50 opacity-0 hover:opacity-100 transition-opacity flex items-center justify-center">
                               <div className="absolute top-2 right-2 flex space-x-1">
                                 <button
@@ -792,9 +841,9 @@ export function PropertyModal({ isOpen, onClose, property, onSuccess }: Property
                                   onClick={() => removeVideo(index)}
                                   className="bg-white rounded-full p-1.5 shadow-md"
                                   title="Remove video"
-                                  disabled={isImageLoading || isSubmitting}
+                                  disabled={isVideoLoading || isSubmitting}
                                 >
-                                  {isImageLoading ? (
+                                  {isVideoLoading ? (
                                     <Loader2 className="h-3 w-3 text-primary animate-spin" />
                                   ) : (
                                     <X className="h-3 w-3 text-red-500" />
@@ -807,8 +856,8 @@ export function PropertyModal({ isOpen, onClose, property, onSuccess }: Property
 
                         {/* Add more videos tile */}
                         <div
-                          onClick={() => !isImageLoading && !isSubmitting && videoInputRef.current?.click()}
-                          className={`border border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center h-32 bg-gray-50 ${!isImageLoading && !isSubmitting ? "hover:bg-gray-100 cursor-pointer" : "opacity-50 cursor-not-allowed"}`}
+                          onClick={() => !isVideoLoading && !isSubmitting && videoInputRef.current?.click()}
+                          className={`border border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center h-32 bg-gray-50 ${!isVideoLoading && !isSubmitting ? "hover:bg-gray-100 cursor-pointer" : "opacity-50 cursor-not-allowed"}`}
                         >
                           <FileVideo className="h-8 w-8 text-gray-400 mb-1" />
                           <span className="text-xs text-gray-500">Add Video</span>
@@ -816,8 +865,8 @@ export function PropertyModal({ isOpen, onClose, property, onSuccess }: Property
                       </div>
                     ) : (
                       <div
-                        onClick={() => !isImageLoading && !isSubmitting && videoInputRef.current?.click()}
-                        className={`border border-dashed border-gray-300 rounded-lg p-4 flex flex-col items-center justify-center h-32 bg-gray-50 ${!isImageLoading && !isSubmitting ? "hover:bg-gray-100 cursor-pointer" : "opacity-50 cursor-not-allowed"}`}
+                        onClick={() => !isVideoLoading && !isSubmitting && videoInputRef.current?.click()}
+                        className={`border border-dashed border-gray-300 rounded-lg p-4 flex flex-col items-center justify-center h-32 bg-gray-50 ${!isVideoLoading && !isSubmitting ? "hover:bg-gray-100 cursor-pointer" : "opacity-50 cursor-not-allowed"}`}
                       >
                         <FileVideo className="h-8 w-8 text-gray-400 mb-2" />
                         <span className="text-sm text-gray-500">Upload Videos</span>
@@ -1047,7 +1096,7 @@ export function PropertyModal({ isOpen, onClose, property, onSuccess }: Property
 
                   <button
                     type="submit"
-                    disabled={isSubmitting || isImageLoading}
+                    disabled={isSubmitting || isImageLoading || isVideoLoading}
                     className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-600 transition-colors disabled:opacity-70 flex items-center justify-center gap-2"
                   >
                     {isSubmitting ? (
